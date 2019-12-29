@@ -1,10 +1,11 @@
 import os
-from glob import  glob
+from glob import glob
 import pandas as pd
 
 import common as C
 from process_woori_bank import woori_bank
 from process_card import bank_salad
+from aggregator import aggregate_data
 
 
 def merge_data(srcpattern, dstfile):
@@ -21,7 +22,7 @@ def merge_data(srcpattern, dstfile):
         merged.append(data)
     merged = pd.concat(merged, axis=0)
     merged = merged.drop_duplicates(subset=['시간', '내용'], keep='first')
-    merged = merged.sort_values(['분류', '시간'], ascending=[True, False])
+    merged = merged.sort_values(['자동분류', '시간'], ascending=[True, False])
     merged.to_excel(dstfile, sheet_name=C.SHEET_NAME, index=False)
 
 
@@ -49,17 +50,18 @@ def update_auto_label(srcfile, dstfile):
 
     dstdata = dstdata.rename(columns={'비고': '기존비고'})
     dstdata = srcdata.merge(dstdata.loc[:, ['시간', '내용', '수동분류', '기존비고']], how='left', on=['시간', '내용'])
-    dstdata.loc[:, '최종분류'] = dstdata['분류']
-    dstdata.loc[~dstdata['수동분류'].isna(), '최종분류'] = dstdata.loc[~dstdata['수동분류'].isna(), '수동분류']
+    dstdata.loc[:, '분류'] = dstdata['자동분류']
+    dstdata.loc[~dstdata['수동분류'].isna(), '분류'] = dstdata.loc[~dstdata['수동분류'].isna(), '수동분류']
     dstdata.loc[~dstdata['기존비고'].isna(), '비고'] = dstdata.loc[~dstdata['기존비고'].isna(), '기존비고']
     dstdata = dstdata.loc[:, C.CORRECT_COLUMNS]
-    dstdata = dstdata.sort_values(['최종분류', '시간'], ascending=[True, False])
+    dstdata = dstdata.sort_values(['분류', '시간'], ascending=[True, False])
     dstdata.to_excel(dstfile, sheet_name=C.SHEET_NAME, index=False)
 
 
 def main():
     pd.set_option('max_columns', 10)
     pd.set_option('display.width', 200)
+    pd.set_option('display.float_format', lambda x: '%.1f' % x)
     start_date = pd.to_datetime("2019-01-01 00:00:00")
     end_date = pd.to_datetime("2020-01-01 00:00:00")
 
@@ -69,7 +71,7 @@ def main():
     merge_data('label_*카드.xlsx', 'merge_카드.xlsx')
     update_auto_label('merge_은행.xlsx', 'correct_은행.xlsx')
     update_auto_label('merge_카드.xlsx', 'correct_카드.xlsx')
-    # aggregate_data([wb_data, bs_data])
+    aggregate_data('correct_*.xlsx')
 
 
 if __name__ == '__main__':

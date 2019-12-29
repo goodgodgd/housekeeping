@@ -4,23 +4,22 @@ from tabulate import tabulate
 import common as C
 
 SALAD_RENAMER = {"금액": "출금", "결제수단": "취급점"}
-CATEGORIES = "월급, 기타수입, 일상지출, 정기지출, 특별지출, 내부이체, 외부이체, 대출, 투자, 저축, 카드"
 
 
 class CardLabeler:
     def a_set_unknown(self, data):
-        data['분류'] = '미정'
+        data['자동분류'] = '미정'
         print("a_set_unknown")
         return data
 
     def b_special_expense(self, data):
-        mask = (data['출금'] > 100000) & (data['분류'] == '미정')
-        data.loc[mask, '분류'] = '특별지출'
+        mask = (data['출금'] > 100000) & (data['자동분류'] == '미정')
+        data.loc[mask, '자동분류'] = '특별지출'
         print("b_special_expense")
         return data
 
     def z_set_rest(self, data):
-        data.loc[data['분류'] == '미정', '분류'] = '일상지출'
+        data.loc[data['자동분류'] == '미정', '자동분류'] = '일상지출'
         print("z_set_rest")
         return data
 
@@ -65,12 +64,15 @@ def rearrange_inout(data):
 def bank_salad(srcfile, srcsheet, dstfile, start_date, end_date):
     srcfile = os.path.join(C.DATA_ROOT, 'src', srcfile)
     dstfile = os.path.join(C.DATA_ROOT, 'result', dstfile)
+    if os.path.isfile(dstfile):
+        print("bank_salad file is already processed:", dstfile)
+        return
     data = pd.read_excel(srcfile, sheet_name=srcsheet, header=0, converters={'날짜': str, '시간': str})
 
     data = preprocess(data, start_date, end_date)
     data = C.label_data(data, CardLabeler)
     print(tabulate(data.head(10), headers='keys'))
-    data = data.sort_values(['분류', '시간'], ascending=[True, False])
+    data = data.sort_values(['자동분류', '시간'], ascending=[True, False])
 
     data.to_excel(dstfile, sheet_name=C.SHEET_NAME, index=False)
     return data
